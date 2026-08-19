@@ -15,8 +15,8 @@ def chunk(docs,chunksize=100,overlap=50):
             chun=i[start:start+chunksize]
             chunks.append(chun)
             start=start+chunksize-overlap
-    # if len(chunks)<chunksize:
-    #     print(chunks )
+    if len(chunks)<chunksize:
+        print(chunks )
 
     return chunks
 
@@ -41,15 +41,64 @@ index.add(embeddings)
 print(index.ntotal)
 query=input()
 querys=model.encode([query])
-D, I = index.search(querys, k=3)
-# print(I,D)
+D, I = index.search(querys, k=8)
+print(I,D)
 retrieved_chunks = [chunks[i] for i in I[0]]
-# print(retrieved_chunks)
+print(retrieved_chunks)
+retrieved_embeddings = embeddings[I[0]]
 sentences=[]
-for chunk in retrieved_chunks:
-    sentence=" ".join(chunk)
-    sentences.append(sentence)
-context="\n".join(sentences)
+
+def mmr(querys, retrieved_embeddings, top_k=3, lambda_param=0.7):
+
+    import numpy as np
+
+    # normalize (cosine similarity)
+    query = querys / np.linalg.norm(querys, axis=1, keepdims=True)
+    chunks = retrieved_embeddings / np.linalg.norm(retrieved_embeddings, axis=1, keepdims=True)
+
+    # relevance scores
+    relevance = (query @ chunks.T)[0]
+
+    selected_indices = []
+
+    for _ in range(top_k):
+
+        best_score = -1e9
+        best_idx = -1
+
+        for i in range(len(chunks)):
+
+            if i in selected_indices:
+                continue
+
+            rel = relevance[i]
+
+            if len(selected_indices) == 0:
+                diversity = 0
+            else:
+                sim = [chunks[i] @ chunks[j] for j in selected_indices]
+                diversity = max(sim)
+
+            score = lambda_param * rel - (1 - lambda_param) * diversity
+
+            if score > best_score:
+                best_score = score
+                best_idx = i
+
+        selected_indices.append(best_idx)
+
+    return selected_indices
+
+
+retrieved_embeddings = embeddings[I[0]]
+
+selected = mmr(querys, retrieved_embeddings, top_k=3)
+
+final_chunks = [retrieved_chunks[i] for i in selected]
+
+sentences = [" ".join(chunk) for chunk in final_chunks]
+context = "\n".join(sentences)
+
 print(context)
 
 prompt = f"""
@@ -62,7 +111,6 @@ Context:
 Question:
 {query}
 """
-from google import genai
 import os
 client = genai.Client(api_key=os.getenv("API_KEY"))
 
