@@ -89,9 +89,9 @@ pip install sentence-transformers faiss-cpu google-generativeai numpy
 
 ## Future Improvements
 
-- Add reranking for better retrieval accuracy  
-- Improve chunking and preprocessing  
-- Add context filtering and deduplication  
+- Add reranking for better retrieval accuracy  ##done (added reranking)
+- Improve chunking and preprocessing   ##done
+- Add context filtering and deduplication   ##done (added mmr)
 - Build a user interface  
 - Introduce caching for performance  
 
