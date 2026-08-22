@@ -66,3 +66,6 @@ Build a user interface
 Introduce caching for performance
 Project Type
 Educational project demonstrating the core concepts behind RAG systems.
+
+
+Also you will have to upload your text file to check the work
