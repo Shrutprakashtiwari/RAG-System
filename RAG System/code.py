@@ -6,6 +6,7 @@ import re
 
 doc = fitz.open("/content/Azure RTOS_Whitepaper.pdf")
 docs = ""
+
 for page in doc:
     docs += page.get_text()
 
@@ -17,12 +18,14 @@ import numpy as np
 def chunk(docs, chunksize=500, overlap=100):
     words = docs.split()
     chunks = []
+
     start = 0
     while start < len(words):
         chun = words[start:start + chunksize]
         chunk_text = " ".join(chun)
         chunks.append(chunk_text)
         start += chunksize - overlap
+
     return chunks
 
 def embedding(chunks, model):
@@ -37,6 +40,11 @@ model = SentenceTransformer("all-MiniLM-L6-v2")
 chunks = chunk(docs)
 embeddings = embedding(chunks, model)
 
+# BM25 setup
+from rank_bm25 import BM25Okapi
+tokenized_chunks = [chunk.split() for chunk in chunks]
+bm25 = BM25Okapi(tokenized_chunks)
+
 import faiss
 
 dimension = embeddings.shape[1]
@@ -50,6 +58,26 @@ faiss.normalize_L2(querys)
 
 D, I = index.search(querys, k=8)
 print(I, D)
+
+# HYBRID SEARCH START
+tokenized_query = query.split()
+bm25_scores = bm25.get_scores(tokenized_query)
+
+faiss_scores = D[0]
+faiss_indices = I[0]
+
+combined = []
+
+for idx, f_score in zip(faiss_indices, faiss_scores):
+    b_score = bm25_scores[idx]
+    score = 0.7 * f_score + 0.3 * b_score
+    combined.append((idx, score))
+
+combined = sorted(combined, key=lambda x: x[1], reverse=True)
+new_indices = [idx for idx, _ in combined]
+
+I[0] = new_indices
+# HYBRID SEARCH END
 
 retrieved_chunks = [chunks[i] for i in I[0]]
 print(retrieved_chunks)
